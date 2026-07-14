@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "divergede"
+version = "0.1.0"
+description = "Conditional negative-binomial detection of branch-divergent expression along pseudotime"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Ling Sun" },
+  { name = "Naiqian Zhang", email = "nqzhang@email.sdu.edu.cn" },
+]
+maintainers = [
+  { name = "Ling Sun" },
+  { name = "Naiqian Zhang", email = "nqzhang@email.sdu.edu.cn" },
+]
+keywords = ["single-cell", "pseudotime", "negative-binomial", "differential-expression"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "pandas>=2.0",
+  "matplotlib>=3.7",
+  "joblib>=1.4",
+  "threadpoolctl>=3.2",
+  "tqdm>=4.65",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/SDU-W-Zhanglab/DivergeDE"
+Repository = "https://github.com/SDU-W-Zhanglab/DivergeDE"
+Issues = "https://github.com/SDU-W-Zhanglab/DivergeDE/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
