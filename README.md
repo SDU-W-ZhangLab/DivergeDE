@@ -73,7 +73,7 @@ Pandas DataFrames, NumPy arrays, and SciPy sparse count matrices are supported.
 Use `genes=[...]` to fit a subset. Size factors are disabled by default; pass
 `size_factors="library_size"` or a positive vector to enable an offset.
 
-## Results
+## Outputs
 
 `result.summary` contains:
 
@@ -164,10 +164,6 @@ python examples/simulation_1.py
 python examples/simulation_2.py
 python examples/evaluate_simulations.py
 ```
-
-With the v0.1.0 defaults, Simulation 2 gives a ΔBIC ROC AUC of `0.9963`; 1000 of
-1000 genes converge, and the q75 plus effect-size evidence rule selects 0 false
-positives among 700 null genes in this simulation realization.
 
 ## Citation
 
