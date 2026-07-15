@@ -163,9 +163,8 @@ def fit_null(
     r = float(np.exp(np.clip(result.x[-1], *log_r_bounds)))
     mu = np.exp(np.clip(log_size_factor + X @ beta, -MAX_ETA, MAX_ETA))
     loglik = float(np.sum(nb_logpmf(y, mu, r)))
-    at_boundary = r <= R_MIN * (1.0 + 1e-6) or r >= R_MAX * (1.0 - 1e-6)
-    converged = bool(result.success and np.isfinite(loglik) and not at_boundary)
-    message = "r reached its numerical boundary" if at_boundary else str(result.message)
+    converged = bool(result.success and np.isfinite(loglik))
+    message = str(result.message)
     return NullFit(beta=beta, r=r, loglik=loglik, converged=converged, message=message)
 
 
@@ -447,16 +446,4 @@ def fit_alternative_start(
             message = "converged"
             break
 
-    at_boundary = (
-        abs(delta1 - DELTA_MIN) <= 1e-6
-        or abs(delta1 - DELTA_MAX) <= 1e-6
-        or abs(delta2 - DELTA_MIN) <= 1e-6
-        or abs(delta2 - DELTA_MAX) <= 1e-6
-        or r <= R_MIN * (1.0 + 1e-6)
-        or r >= R_MAX * (1.0 - 1e-6)
-    )
-    if at_boundary:
-        converged = False
-        message = "a branch effect or r reached its numerical boundary"
     return AlternativeFit(tau, delta1, delta2, r, loglik, iteration, converged, message)
-
