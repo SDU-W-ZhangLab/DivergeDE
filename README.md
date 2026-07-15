@@ -165,7 +165,7 @@ python examples/simulation_2.py
 python examples/evaluate_simulations.py
 ```
 
-With the v0.1.0 defaults, Simulation 2 gives a ΔBIC ROC AUC of `0.9964`; 998 of
+With the v0.1.0 defaults, Simulation 2 gives a ΔBIC ROC AUC of `0.9963`; 1000 of
 1000 genes converge, and the q75 plus effect-size evidence rule selects 0 false
 positives among 700 null genes in this simulation realization.
 
