@@ -132,13 +132,23 @@ def fit_null(
     log_size_factor: np.ndarray,
     max_iter: int,
     likelihood_tolerance: float,
+    initial_beta: np.ndarray | None = None,
+    initial_r: float | None = None,
 ) -> NullFit:
     """Fit the unpenalized H0 spline and gene-specific r."""
     y = np.asarray(y, dtype=float)
     X = np.asarray(X, dtype=float)
     log_size_factor = np.asarray(log_size_factor, dtype=float)
-    beta0, *_ = np.linalg.lstsq(X, np.log(y + 0.1) - log_size_factor, rcond=None)
-    theta0 = np.concatenate([beta0, np.array([0.0])])
+    if initial_beta is None:
+        beta0, *_ = np.linalg.lstsq(X, np.log(y + 0.1) - log_size_factor, rcond=None)
+    else:
+        beta0 = np.asarray(initial_beta, dtype=float)
+        if beta0.shape != (X.shape[1],) or not np.isfinite(beta0).all():
+            raise ValueError("initial_beta is incompatible with the null-model basis.")
+    r0 = 1.0 if initial_r is None else float(initial_r)
+    if not np.isfinite(r0) or r0 <= 0:
+        raise ValueError("initial_r must be finite and positive.")
+    theta0 = np.concatenate([beta0, np.array([np.log(np.clip(r0, R_MIN, R_MAX))])])
     log_r_bounds = (float(np.log(R_MIN)), float(np.log(R_MAX)))
 
     def objective(theta: np.ndarray) -> tuple[float, np.ndarray]:
@@ -163,7 +173,12 @@ def fit_null(
     r = float(np.exp(np.clip(result.x[-1], *log_r_bounds)))
     mu = np.exp(np.clip(log_size_factor + X @ beta, -MAX_ETA, MAX_ETA))
     loglik = float(np.sum(nb_logpmf(y, mu, r)))
-    converged = bool(result.success and np.isfinite(loglik))
+    converged = bool(
+        result.success
+        and np.isfinite(loglik)
+        and np.isfinite(beta).all()
+        and np.isfinite(r)
+    )
     message = str(result.message)
     return NullFit(beta=beta, r=r, loglik=loglik, converged=converged, message=message)
 
@@ -446,4 +461,8 @@ def fit_alternative_start(
             message = "converged"
             break
 
+    finite_parameters = np.isfinite([tau, delta1, delta2, r]).all()
+    if not np.isfinite(loglik) or not finite_parameters:
+        converged = False
+        message = "non-finite final likelihood or parameters"
     return AlternativeFit(tau, delta1, delta2, r, loglik, iteration, converged, message)
