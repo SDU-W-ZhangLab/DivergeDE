@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use DivergeDE, please cite this software and the associated manuscript."
 title: "DivergeDE"
 type: software
-version: 0.1.0
-date-released: 2026-07-14
+version: 0.2.0
+date-released: 2026-07-15
 license: MIT
 authors:
   - family-names: Sun
@@ -15,4 +15,3 @@ authors:
     orcid: "https://orcid.org/0000-0003-0800-0016"
 repository-code: "https://github.com/SDU-W-Zhanglab/DivergeDE"
 url: "https://github.com/SDU-W-Zhanglab/DivergeDE"
-
