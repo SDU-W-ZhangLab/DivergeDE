@@ -122,7 +122,7 @@ figure = divergede.plot_three_branch_stages(three, "GATA1")
 The composite is a display reconstruction, not an additional fitted model.
 The stage plot is the authoritative view of the two numerical fits.
 
-## Results
+## Outputs and results
 
 `result.summary` contains:
 
@@ -223,10 +223,6 @@ python examples/simulation_1.py
 python examples/simulation_2.py
 python examples/evaluate_simulations.py
 ```
-
-With the v0.1.0 defaults, Simulation 2 gives a ΔBIC ROC AUC of `0.9963`; 1000 of
-1000 genes converge, and the q75 plus effect-size evidence rule selects 0 false
-positives among 700 null genes in this simulation realization.
 
 ## Citation
 
