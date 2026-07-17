@@ -34,7 +34,6 @@ for index, figure in enumerate(pages, start=1):
     figure.savefig(OUTPUT / f"top_genes_page_{index}.pdf", bbox_inches="tight")
     plt.close(figure)
 
-figure = divergede.plot_bic_vs_terminal_fc(result)
-figure.savefig(OUTPUT / "bic_vs_terminal_fc.pdf", bbox_inches="tight")
+figure = divergede.plot_bic_vs_posttau_fc(result)
+figure.savefig(OUTPUT / "bic_vs_posttau_fc.pdf", bbox_inches="tight")
 plt.close(figure)
-

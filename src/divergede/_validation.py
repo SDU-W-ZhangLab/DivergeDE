@@ -101,6 +101,7 @@ def prepare_data(
     genes,
     branch_names,
     size_factors,
+    endpoint_branch_labels=None,
 ) -> PreparedData:
     matrix, names, cell_index = _validate_counts(counts)
     n_cells = matrix.shape[0]
@@ -162,8 +163,23 @@ def prepare_data(
             raise ValueError("size_factors must be finite, positive, and match the number of cells.")
         factor_mode = "provided"
 
-    branch1 = probabilities[:, 0] > probabilities[:, 1]
-    branch2 = probabilities[:, 1] > probabilities[:, 0]
+    if endpoint_branch_labels is None:
+        branch1 = probabilities[:, 0] > probabilities[:, 1]
+        branch2 = probabilities[:, 1] > probabilities[:, 0]
+    else:
+        endpoint_labels = _aligned_vector(
+            endpoint_branch_labels, cell_index, "endpoint_branch_labels"
+        )
+        if endpoint_labels.size != n_cells:
+            raise ValueError(
+                "endpoint_branch_labels length must equal the number of cells."
+            )
+        if not np.isfinite(endpoint_labels).all() or not np.isin(
+            endpoint_labels, [0.0, 1.0]
+        ).all():
+            raise ValueError("endpoint_branch_labels must contain only 0 and 1.")
+        branch1 = endpoint_labels == 0.0
+        branch2 = endpoint_labels == 1.0
     if not np.any(branch1) or not np.any(branch2):
         raise ValueError("Both branches need at least one probability-dominant cell to define their endpoints.")
     endpoint1 = float(np.max(t[branch1]))

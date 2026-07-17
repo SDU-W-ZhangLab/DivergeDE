@@ -357,9 +357,22 @@ def quick_start(
     delta1 = 0.0
     delta2 = 0.0
     r = float(r0)
-    for _ in range(2):
-        weights1, weights2 = e_step(y, mu0, t, probabilities, tau, delta1, delta2, r, kappa)
+    uniform_prior = np.allclose(probabilities, 0.5, rtol=0.0, atol=1e-12)
+    for iteration in range(2):
         activation = gate(t - tau, kappa)
+        if uniform_prior and iteration == 0:
+            variance = mu0 + mu0**2 / max(r, R_MIN)
+            residual = (y - mu0) / np.sqrt(np.maximum(variance, EPS))
+            order = np.argsort(residual, kind="stable")
+            ranks = np.empty_like(order, dtype=float)
+            ranks[order] = np.arange(order.size, dtype=float)
+            scaled_rank = ranks / max(order.size - 1, 1)
+            weights1 = np.where(activation > EPS, 0.1 + 0.8 * scaled_rank, 0.5)
+            weights2 = 1.0 - weights1
+        else:
+            weights1, weights2 = e_step(
+                y, mu0, t, probabilities, tau, delta1, delta2, r, kappa
+            )
         delta1 = update_delta(y, mu0, activation, weights1, r, delta1)
         delta2 = update_delta(y, mu0, activation, weights2, r, delta2)
         _, mu1, mu2 = branch_means(mu0, t, tau, delta1, delta2, kappa)

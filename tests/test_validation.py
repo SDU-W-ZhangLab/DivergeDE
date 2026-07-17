@@ -33,3 +33,29 @@ def test_transformed_counts_are_rejected():
             None,
             None,
         )
+
+
+def test_endpoint_labels_allow_uniform_no_prior_probabilities():
+    counts = pd.DataFrame(
+        [[1], [2], [3], [4]],
+        index=["c1", "c2", "c3", "c4"],
+        columns=["g1"],
+    )
+    t = pd.Series([0.0, 0.3, 0.7, 1.0], index=counts.index)
+    probabilities = pd.DataFrame(
+        0.5,
+        index=counts.index,
+        columns=["A", "B"],
+    )
+    endpoint_labels = pd.Series([0, 1, 0, 1], index=counts.index)
+    prepared = prepare_data(
+        counts,
+        t,
+        probabilities,
+        None,
+        None,
+        None,
+        endpoint_labels,
+    )
+    assert np.allclose(prepared.probabilities, 0.5)
+    assert prepared.common_terminal == 0.7
