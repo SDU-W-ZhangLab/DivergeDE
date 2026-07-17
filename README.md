@@ -18,7 +18,7 @@ DivergeDE reports, for each gene:
 
 - a conditional ΔBIC score for evidence ranking;
 - the estimated divergence onset `tau`;
-- the terminal log2 fold change between the two branches;
+- the fitted mean post-tau log2 fold change between the two branches;
 - fitted branch-specific expression curves.
 
 ## Installation
@@ -73,6 +73,12 @@ Only three inputs are required:
 Pandas DataFrames, NumPy arrays, and SciPy sparse count matrices are supported.
 Use `genes=[...]` to fit a subset. Size factors are disabled by default; pass
 `size_factors="library_size"` or a positive vector to enable an offset.
+For a strict no-prior ablation with uniform branch probabilities, pass
+zero/one `endpoint_branch_labels`; these labels are used only to determine the
+common fitting endpoint and are not used in the expression likelihood.
+Uniform-prior fits use a deterministic expression-residual split only to break
+the initially symmetric EM solution; all subsequent responsibilities are
+updated from the expression likelihood with branch weights fixed at 0.5/0.5.
 
 ## Three-branch trajectories
 
@@ -127,19 +133,22 @@ The stage plot is the authoritative view of the two numerical fits.
 `result.summary` contains:
 
 ```text
-gene, converged, delta_bic, tau, terminal_log2fc,
+gene, converged, delta_bic, tau, mean_posttau_log2fc,
 loglik_null, loglik_alternative, r_null, r_alternative, n_iter
 ```
 
-Positive `terminal_log2fc` indicates higher fitted expression on Branch 1;
+`mean_posttau_log2fc` is the signed pointwise fitted log2 fold change averaged
+by 100-point trapezoidal integration from the estimated `tau` to the common
+terminal. Positive values indicate higher fitted expression on Branch 1;
 negative values indicate higher expression on Branch 2. Non-converged genes
 remain in the summary but are excluded from default ranking and plots.
 
 Both two- and three-branch results expose `result.diagnostics`. Fit outcomes
 use five statuses: `converged`, `not_fitted`, `max_iter`,
-`numerical_failure`, and `error`. The original two-branch summary columns are
-unchanged. Fits stopped only by the iteration limit can be continued from their
-best finite parameters:
+`numerical_failure`, and `error`. Three-branch summaries report
+`stage1_mean_posttau_log2fc` and `stage2_mean_posttau_log2fc` for the two
+numerical stages. Fits stopped only by the iteration limit can be continued
+from their best finite parameters:
 
 ```python
 refitted = divergede.refit_failed(result, max_iter=300)
@@ -167,10 +176,10 @@ pages = divergede.plot_genes(
     max_per_page=12,
 )
 
-# Conditional ΔBIC versus terminal effect
-figure = divergede.plot_bic_vs_terminal_fc(
+# Conditional ΔBIC versus mean post-tau effect
+figure = divergede.plot_bic_vs_posttau_fc(
     result,
-    bic_quantile=0.75,
+    bic_threshold=10,
     log2fc_threshold=1.0,
     label_top=0,
 )
@@ -180,9 +189,10 @@ Cells are colored by their Branch 1 probability. Branch 1 is orange-red,
 Branch 2 is blue, and the shared null curve is gray and dashed. Plotting uses a
 `log1p` display scale by default; model fitting always uses original counts.
 
-In the ΔBIC-effect plot, genes above the ΔBIC q75 threshold and with
-`abs(terminal_log2fc) >= 1` are highlighted. This is a descriptive evidence
-rule, not a p-value or false-discovery-rate threshold.
+In the ΔBIC-effect plot, genes with `conditional_delta_BIC > 10` and
+`abs(mean_posttau_log2fc) >= 1` are highlighted. This prespecified operational
+rule is not a p-value, false-discovery-rate cutoff, or conventional
+standard-BIC evidence threshold.
 
 ## Method notes
 
@@ -215,13 +225,45 @@ Genes are fitted in parallel with `joblib`'s `loky` process backend.
 The repository contains two simulated datasets:
 
 - `simulation_1`: 500 cells and 60 true DE genes, for curve and tau evaluation;
-- `simulation_2`: 500 cells and 1000 genes, including 300 DE and 700 non-DE
-  genes, for detection evaluation.
+- `simulation_2`: 500 cells and 1000 genes, including 300 structurally
+  branch-divergent genes and 700 structural-null genes. The 300 structural DE
+  genes are balanced across early, middle, and late divergence (100 each) and
+  across weak, moderate, and strong effects (100 each).
+
+### Simulation 2 truth and evaluation definitions
+
+The 300 structural DE genes were sampled without replacement from the 1000
+genes and assigned nonzero branch-specific effects. The other 700 genes have
+zero branch contrast (`true_delta1 = true_delta2 = 0`). In
+`gene_truth.csv`, `is_de` records this structural truth.
+
+Effect size is the true mean absolute post-tau log2 fold change, evaluated over
+`[true_tau, 1]`. The weak, moderate, and strong ranges are 0.5-1, 1-2, and 2-3,
+respectively. For the manuscript detection benchmark, a gene is a prespecified
+effect-qualified positive when
+
+```text
+is_de == True and true_abs_mean_posttau_log2fc >= 1
+```
+
+This definition gives 200 positives (the moderate and strong structural DE
+genes). The 100 weak structural DE genes remain true branch-divergent genes,
+but are treated as evaluation negatives for this effect-qualified benchmark;
+the other 700 evaluation negatives are structural nulls.
+
+A fitted gene is called positive using the prespecified operational rule
+
+```text
+conditional_delta_BIC > 10 and abs(mean fitted post-tau log2FC) >= 1
+```
+
+This is an operational detection threshold, not a p-value or FDR cutoff, and
+`conditional_delta_BIC > 10` is not presented as a conventional standard-BIC
+evidence threshold.
 
 ```bash
 python examples/simulation_1.py
 python examples/simulation_2.py
-python examples/evaluate_simulations.py
 ```
 
 ## Citation

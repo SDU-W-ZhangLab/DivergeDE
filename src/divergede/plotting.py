@@ -27,7 +27,7 @@ PROBABILITY_CMAP = LinearSegmentedColormap.from_list(
 def _valid_summary(result: DivergeDEResult):
     summary = result.summary
     finite = np.isfinite(summary["delta_bic"]) & np.isfinite(summary["tau"]) & np.isfinite(
-        summary["terminal_log2fc"]
+        summary["mean_posttau_log2fc"]
     )
     return summary.loc[summary["converged"].astype(bool) & finite].copy()
 
@@ -121,7 +121,7 @@ def _draw_gene(
     ax.set_xlabel("Pseudotime")
     ax.set_ylabel(y_label)
     ax.set_title(
-        f"{gene} | ΔBIC={row['delta_bic']:.2f} | τ={row['tau']:.3f} | terminal log2FC={row['terminal_log2fc']:.2f}",
+        f"{gene} | ΔBIC={row['delta_bic']:.2f} | τ={row['tau']:.3f} | mean post-τ log2FC={row['mean_posttau_log2fc']:.2f}",
         fontsize=10,
     )
     ax.legend(frameon=False, fontsize=8)
@@ -235,18 +235,20 @@ def plot_genes(
     return figures
 
 
-def plot_bic_vs_terminal_fc(
+def plot_bic_vs_posttau_fc(
     result: DivergeDEResult,
     genes: Sequence[str] | None = None,
     label_top: int = 0,
-    bic_quantile: float = 0.75,
+    bic_threshold: float = 10.0,
     log2fc_threshold: float = 1.0,
     ax: Axes | None = None,
 ) -> Figure:
-    """Plot conditional delta BIC against terminal log2 fold change."""
-    if not 0.0 <= float(bic_quantile) <= 1.0:
-        raise ValueError("bic_quantile must be in [0, 1].")
-    if float(log2fc_threshold) < 0 or int(label_top) < 0:
+    """Plot conditional delta BIC against fitted mean post-tau log2FC."""
+    bic_threshold = float(bic_threshold)
+    log2fc_threshold = float(log2fc_threshold)
+    if not np.isfinite(bic_threshold):
+        raise ValueError("bic_threshold must be finite.")
+    if not np.isfinite(log2fc_threshold) or log2fc_threshold < 0 or int(label_top) < 0:
         raise ValueError("log2fc_threshold and label_top must be non-negative.")
     valid = _valid_summary(result)
     excluded = len(result.summary) - len(valid)
@@ -258,7 +260,6 @@ def plot_bic_vs_terminal_fc(
         )
     if valid.empty:
         raise ValueError("No converged genes are available to plot.")
-    bic_threshold = float(valid["delta_bic"].quantile(float(bic_quantile)))
     if genes is None:
         display = valid.copy()
     else:
@@ -277,37 +278,75 @@ def plot_bic_vs_terminal_fc(
         display = valid.set_index("gene").reindex([gene for gene in requested if gene in valid_names]).reset_index()
     if display.empty:
         raise ValueError("No converged requested genes are available to plot.")
-    x = display["terminal_log2fc"].to_numpy(dtype=float)
+    x = display["mean_posttau_log2fc"].to_numpy(dtype=float)
     y = display["delta_bic"].to_numpy(dtype=float)
-    evidence = y >= bic_threshold
-    branch1 = evidence & (x >= float(log2fc_threshold))
-    branch2 = evidence & (x <= -float(log2fc_threshold))
-    colors = np.full(len(display), NEUTRAL_COLOR, dtype=object)
-    colors[branch1] = BRANCH1_COLOR
-    colors[branch2] = BRANCH2_COLOR
+    evidence = y > bic_threshold
+    branch1 = evidence & (x >= log2fc_threshold)
+    branch2 = evidence & (x <= -log2fc_threshold)
+    not_called = ~(branch1 | branch2)
     if ax is None:
         figure, ax = plt.subplots(figsize=(6.5, 5.0))
     else:
         figure = ax.figure
-    ax.scatter(x, y, c=colors, s=28, alpha=0.8, linewidths=0)
-    ax.axhline(bic_threshold, color="#555555", linestyle="--", linewidth=1.2, label=f"ΔBIC q{int(round(100*bic_quantile))}")
-    ax.axvline(float(log2fc_threshold), color="#777777", linestyle="--", linewidth=1.0)
-    ax.axvline(-float(log2fc_threshold), color="#777777", linestyle="--", linewidth=1.0)
+    ax.scatter(
+        x[not_called],
+        y[not_called],
+        c=NEUTRAL_COLOR,
+        s=28,
+        alpha=0.8,
+        linewidths=0,
+        label="Not called",
+    )
+    ax.scatter(
+        x[branch1],
+        y[branch1],
+        c=BRANCH1_COLOR,
+        s=28,
+        alpha=0.8,
+        linewidths=0,
+        label=f"{result.branch_names[0]} up",
+    )
+    ax.scatter(
+        x[branch2],
+        y[branch2],
+        c=BRANCH2_COLOR,
+        s=28,
+        alpha=0.8,
+        linewidths=0,
+        label=f"{result.branch_names[1]} up",
+    )
+    ax.axhline(
+        bic_threshold,
+        color="#555555",
+        linestyle="--",
+        linewidth=1.2,
+        label=f"Prespecified ΔBIC > {bic_threshold:g}",
+    )
+    ax.axvline(
+        log2fc_threshold,
+        color="#777777",
+        linestyle="--",
+        linewidth=1.0,
+        label=f"|mean post-τ log2FC| ≥ {log2fc_threshold:g}",
+    )
+    ax.axvline(-log2fc_threshold, color="#777777", linestyle="--", linewidth=1.0)
     if int(label_top):
         label_mask = branch1 | branch2
         labelled = display.loc[label_mask].nlargest(int(label_top), "delta_bic")
         for row in labelled.itertuples(index=False):
             ax.annotate(
                 str(row.gene),
-                (float(row.terminal_log2fc), float(row.delta_bic)),
+                (float(row.mean_posttau_log2fc), float(row.delta_bic)),
                 xytext=(4, 4),
                 textcoords="offset points",
                 fontsize=8,
             )
-    ax.set_xlabel(f"Terminal log2FC ({result.branch_names[0]} / {result.branch_names[1]})")
+    ax.set_xlabel(
+        f"Mean post-$\\hat{{\\tau}}$ fitted log2FC "
+        f"({result.branch_names[0]} / {result.branch_names[1]})"
+    )
     ax.set_ylabel("Conditional ΔBIC")
-    ax.set_title("DivergeDE evidence and terminal effect")
+    ax.set_title("DivergeDE evidence and post-divergence effect")
     ax.legend(frameon=False)
     figure.tight_layout()
     return figure
-

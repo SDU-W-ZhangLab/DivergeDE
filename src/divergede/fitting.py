@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed, parallel_config
 from scipy import sparse
+from scipy.integrate import trapezoid
 from tqdm.auto import tqdm
 
 from ._model import (
@@ -29,13 +30,15 @@ SUMMARY_COLUMNS = [
     "converged",
     "delta_bic",
     "tau",
-    "terminal_log2fc",
+    "mean_posttau_log2fc",
     "loglik_null",
     "loglik_alternative",
     "r_null",
     "r_alternative",
     "n_iter",
 ]
+
+POSTTAU_GRID_SIZE = 100
 
 
 def _gene_vector(matrix: np.ndarray | sparse.spmatrix, index: int) -> np.ndarray:
@@ -50,13 +53,30 @@ def _empty_record(gene: str) -> dict[str, object]:
         "converged": False,
         "delta_bic": np.nan,
         "tau": np.nan,
-        "terminal_log2fc": np.nan,
+        "mean_posttau_log2fc": np.nan,
         "loglik_null": np.nan,
         "loglik_alternative": np.nan,
         "r_null": np.nan,
         "r_alternative": np.nan,
         "n_iter": np.nan,
     }
+
+
+def _mean_posttau_log2fc(
+    tau: float,
+    delta1: float,
+    delta2: float,
+    kappa: float,
+    common_terminal: float,
+) -> float:
+    """Return the signed fitted log2FC averaged over [tau, common terminal]."""
+    if not common_terminal > tau:
+        return np.nan
+    grid = np.linspace(tau, common_terminal, POSTTAU_GRID_SIZE)
+    pointwise_log2fc = (
+        (delta1 - delta2) * gate(grid - tau, kappa) / np.log(2.0)
+    )
+    return float(trapezoid(pointwise_log2fc, grid) / (common_terminal - tau))
 
 
 def _fit_one_gene(
@@ -171,16 +191,19 @@ def _fit_one_gene(
 
         n_fit = int(y.size)
         delta_bic = 2.0 * (alternative.loglik - null.loglik) - 3.0 * np.log(n_fit)
-        terminal_activation = float(gate(np.array([common_terminal - alternative.tau]), kappa)[0])
-        terminal_log2fc = (
-            (alternative.delta1 - alternative.delta2) * terminal_activation / np.log(2.0)
+        mean_posttau_log2fc = _mean_posttau_log2fc(
+            float(alternative.tau),
+            float(alternative.delta1),
+            float(alternative.delta2),
+            kappa,
+            common_terminal,
         )
         record.update(
             {
                 "converged": overall_converged,
                 "delta_bic": float(delta_bic),
                 "tau": float(alternative.tau),
-                "terminal_log2fc": float(terminal_log2fc),
+                "mean_posttau_log2fc": mean_posttau_log2fc,
                 "loglik_null": float(null.loglik),
                 "loglik_alternative": float(alternative.loglik),
                 "r_null": float(null.r),
@@ -258,6 +281,7 @@ def fit(
     parameter_tolerance: float = 1e-4,
     n_jobs: int = 4,
     verbose: int = 1,
+    endpoint_branch_labels=None,
 ) -> DivergeDEResult:
     """Fit DivergeDE to all genes or a selected subset.
 
@@ -283,6 +307,7 @@ def fit(
         genes,
         branch_names,
         size_factors,
+        endpoint_branch_labels,
     )
     fit_mask = prepared.fit_mask
     t_fit = prepared.pseudotime[fit_mask]
