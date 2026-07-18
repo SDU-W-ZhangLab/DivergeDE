@@ -11,7 +11,7 @@ two-branch API remains unchanged, and an explicit two-stage API supports a
 three-terminal-branch topology.
 
 <p align="center">
-  <img src="docs/assets/divergede_overview.png" width="100%" alt="Overview of DivergeDE">
+  <img src="docs/assets/divergede_overview.png?v=2" width="100%" alt="Overview of DivergeDE">
 </p>
 
 DivergeDE reports, for each gene:
